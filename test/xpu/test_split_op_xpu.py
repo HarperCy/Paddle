@@ -83,6 +83,24 @@ class XPUTestSplitOp(XPUOpTestWrapper):
             self.num = 3
             self.indices_or_sections = 3
 
+    # test with big h small w
+    class TestSplitOp3(TestSplitOp):
+        def initParameters(self):
+            self.x = np.random.random((300000, 6)).astype(self.dtype)
+            self.axis = 1
+            self.sections = []
+            self.num = 6
+            self.indices_or_sections = 6
+
+    # test with big h small w
+    # class TestSplitOp4(TestSplitOp):
+    #     def initParameters(self):
+    #         self.x = np.random.random((1, 4096, 1376, 2)).astype(self.dtype)
+    #         self.axis = 3
+    #         self.sections = []
+    #         self.num = 2
+    #         self.indices_or_sections = 2
+
 
 support_types = get_xpu_op_support_types('split')
 for stype in support_types:

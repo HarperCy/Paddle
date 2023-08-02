@@ -129,6 +129,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_tensor,
                  distributed::ReduceOp op,
                  bool sync_op) {
+                // std::cout << "CXK" << "all_reduce" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -148,6 +149,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_tensor,
                  int src,
                  bool sync_op) {
+                // std::cout << "CXK" << "broadcast" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -167,6 +169,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_tensor,
                  int dst,
                  bool sync_op) {
+                // std::cout << "CXK" << "send" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -186,6 +189,7 @@ void BindDistributed(py::module *m) {
                  int nranks,
                  int rank_id,
                  bool sync_op) {
+                // std::cout << "CXK" << "send_partial" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -211,6 +215,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_tensor,
                  int src,
                  bool sync_op) {
+                // std::cout << "CXK" << "recv" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -230,6 +235,7 @@ void BindDistributed(py::module *m) {
                  int nranks,
                  int rank_id,
                  bool sync_op) {
+                // std::cout << "CXK" << "recv_partial" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -255,8 +261,21 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor_list,
                  py::handle py_in_tensor,
                  bool sync_op) {
+                // std::cout << "CXK" << "" << std::endl;
+                phi::XPUPlace place(
+                    phi::backends::xpu::GetXPUCurrentDeviceId());
+                struct timeval t1;
+                struct timeval t2;
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  gettimeofday(&t1, NULL);
+                }
                 auto out_tensor_list =
                     CastPyArg2VectorOfTensor(py_out_tensor_list.ptr(), 0);
+                // for (int i = 0 ; i < 8 ; i ++) {
+                //     auto *tmp =
+                //     reinterpret_cast<phi::DenseTensor*>(out_tensor_list[i].impl().get());
+                // std::cout << "tmp: " << *tmp << std::endl;
+                // }
                 Tensor stack_out_tensor = paddle::stack(out_tensor_list, 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     stack_out_tensor.impl());
@@ -269,8 +288,33 @@ void BindDistributed(py::module *m) {
 
                 auto *dev_ctx = self.GetDeviceContext(in_tensor.place());
                 auto task = self.AllGather(out_dense, in_dense, sync_op);
+
+                // std::cout << "all_gather2" << std::endl;
+                // std::cout << "in_dense: " << in_dense << std::endl;
+                // std::cout << "out_dense: " << *out_dense << std::endl;
+                // std::cout << "p_in_tensor: " << *p_in_tensor << std::endl;
+                // std::cout << "p_out_tensor: " << *p_out_tensor << std::endl;
+
                 SplitTensor(*dev_ctx, *out_dense, &out_tensor_list);
                 task->UpdateWaitChain(*dev_ctx);
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  platform::DeviceContextPool::Instance().Get(place)->Wait();
+                  gettimeofday(&t2, NULL);
+
+                  uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) +
+                                  t2.tv_usec - t1.tv_usec;
+                  VLOG(3) << "op_name "
+                          << "c_all_gather"
+                          << " " << diff << " "
+                          << "XPU"
+                          << " " << in_dense.dtype() << std::endl;
+                  std::cout << "op_name "
+                            << "c_all_gather"
+                            << " " << diff << " "
+                            << "XPU"
+                            << " " << in_dense.dtype() << std::endl;
+                }
+
                 return task;
               },
               py::arg("out"),
@@ -284,6 +328,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor,
                  bool sync_op) {
+                // std::cout << "CXK" << "all_gather_into_tensor" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -307,6 +352,13 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor_list,
                  py::handle py_in_tensor_list,
                  bool sync_op) {
+                phi::XPUPlace place(
+                    phi::backends::xpu::GetXPUCurrentDeviceId());
+                struct timeval t1;
+                struct timeval t2;
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  gettimeofday(&t1, NULL);
+                }
                 auto out_tensor_list =
                     CastPyArg2VectorOfTensor(py_out_tensor_list.ptr(), 0);
                 Tensor stack_out_tensor = paddle::stack(out_tensor_list, 0);
@@ -331,8 +383,26 @@ void BindDistributed(py::module *m) {
                                   GetDefaultSplitSizes(*out_dense, world_size),
                                   GetDefaultSplitSizes(in_dense, world_size),
                                   sync_op);
+                // std::cout << "all_to_all" << std::endl;
                 SplitTensor(*dev_ctx, *out_dense, &out_tensor_list);
                 task->UpdateWaitChain(*dev_ctx);
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  platform::DeviceContextPool::Instance().Get(place)->Wait();
+                  gettimeofday(&t2, NULL);
+
+                  uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) +
+                                  t2.tv_usec - t1.tv_usec;
+                  VLOG(3) << "op_name "
+                          << "c_all_to_all"
+                          << " " << diff << " "
+                          << "XPU"
+                          << " " << in_dense.dtype() << std::endl;
+                  std::cout << "op_name "
+                            << "c_all_to_all"
+                            << " " << diff << " "
+                            << "XPU"
+                            << " " << in_dense.dtype() << std::endl;
+                }
                 return task;
               },
               py::arg("out"),
@@ -346,6 +416,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor,
                  bool sync_op) {
+                // std::cout << "CXK" << "all_to_all_tensor" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -377,6 +448,7 @@ void BindDistributed(py::module *m) {
                  const std::vector<int64_t> &out_sizes,
                  const std::vector<int64_t> &in_sizes,
                  bool sync_op) {
+                // std::cout << "CXK" << "all_to_all_single" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -404,6 +476,7 @@ void BindDistributed(py::module *m) {
                  int dst,
                  distributed::ReduceOp op,
                  bool sync_op) {
+                // std::cout << "CXK" << "reduce" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -425,6 +498,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor_list,
                  distributed::ReduceOp op,
                  bool sync_op) {
+                // std::cout << "CXK" << "reduce_scatter" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -453,6 +527,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  distributed::ReduceOp op,
                  bool sync_op) {
+                // std::cout << "CXK" << "reduce_scatter_tensor" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -479,6 +554,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor_list,
                  int src,
                  bool sync_op) {
+                // std::cout << "CXK" << "scatter" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -506,6 +582,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  int src,
                  bool sync_op) {
+                // std::cout << "CXK" << "scatter_tensor" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -532,6 +609,14 @@ void BindDistributed(py::module *m) {
                  int dst,
                  bool sync_op,
                  bool use_calc_stream) {
+                // std::cout << "CXK" << "gather" << std::endl;
+                phi::XPUPlace place(
+                    phi::backends::xpu::GetXPUCurrentDeviceId());
+                struct timeval t1;
+                struct timeval t2;
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  gettimeofday(&t1, NULL);
+                }
                 auto out_tensor_list =
                     CastPyArg2VectorOfTensor(py_gather_tensor_list.ptr(), 0);
                 Tensor stack_out_tensor = paddle::stack(out_tensor_list, 0);
@@ -549,11 +634,29 @@ void BindDistributed(py::module *m) {
                 distributed::GatherOptions gather_opts{dst};
                 auto task = self.Gather(
                     out_dense, in_dense, gather_opts, sync_op, use_calc_stream);
+                // std::cout << "gather" << std::endl;
                 SplitTensor(*dev_ctx, *out_dense, &out_tensor_list);
                 if (!use_calc_stream &&
                     dev_ctx->GetPlace() != platform::CPUPlace()) {
                   // calculate stream will wait comm stream
                   task->UpdateWaitChain(*dev_ctx);
+                }
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  platform::DeviceContextPool::Instance().Get(place)->Wait();
+                  gettimeofday(&t2, NULL);
+
+                  uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) +
+                                  t2.tv_usec - t1.tv_usec;
+                  VLOG(3) << "op_name "
+                          << "c_gather"
+                          << " " << diff << " "
+                          << "XPU"
+                          << " " << in_dense.dtype() << std::endl;
+                  std::cout << "op_name "
+                            << "c_gather"
+                            << " " << diff << " "
+                            << "XPU"
+                            << " " << in_dense.dtype() << std::endl;
                 }
                 return task;
               },
@@ -566,6 +669,7 @@ void BindDistributed(py::module *m) {
           .def(
               "barrier",
               [](distributed::ProcessGroup &self, int8_t device_id) {
+                // std::cout << "CXK" << "barrier" << std::endl;
                 distributed::BarrierOptions opts;
                 opts.device_id = device_id;
                 return self.Barrier(opts);
@@ -579,6 +683,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "allreduce" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 distributed::AllreduceOptions opts;
                 opts.reduce_op = op;
@@ -596,6 +701,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int source_rank) {
+                // std::cout << "CXK" << "broadcast" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 distributed::BroadcastOptions opts;
                 opts.source_rank = source_rank;
@@ -613,6 +719,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int dst) {
+                // std::cout << "CXK" << "send" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -628,6 +735,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int src) {
+                // std::cout << "CXK" << "recv" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -643,6 +751,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_in_tensor,
                  py::handle py_out_tensor) {
+                // std::cout << "CXK" << "all_gather" << std::endl;
                 auto in_tensor = CastPyArg2Tensor(py_in_tensor.ptr(), 0);
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto in_dense = std::dynamic_pointer_cast<phi::DenseTensor>(
@@ -664,6 +773,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  int nranks,
                  int rank_id) {
+                // std::cout << "CXK" << "all_gather_partial" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -691,6 +801,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_in_tensor,
                  py::handle py_out_tensor) {
+                // std::cout << "CXK" << "alltoall" << std::endl;
                 auto in_tensor = CastPyArg2Tensor(py_in_tensor.ptr(), 0);
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto in_dense = std::dynamic_pointer_cast<phi::DenseTensor>(
@@ -712,6 +823,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  const std::vector<int64_t> in_sizes,
                  const std::vector<int64_t> out_sizes) {
+                // std::cout << "CXK" << "alltoall_single" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -737,6 +849,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  int dst,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "reduce" << std::endl;
                 auto in_tensor = CastPyArg2Tensor(py_in_tensor.ptr(), 0);
                 distributed::ReduceOptions opts;
                 opts.reduce_op = op;
@@ -757,6 +870,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  py::handle py_out_tensor,
                  int src) {
+                // std::cout << "CXK" << "scatter" << std::endl;
                 auto in_tensor = CastPyArg2Tensor(py_in_tensor.ptr(), 0);
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 distributed::ScatterOptions opts;
@@ -779,6 +893,13 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_out_tensor_list,
                  py::handle py_in_tensor) {
+                phi::XPUPlace place(
+                    phi::backends::xpu::GetXPUCurrentDeviceId());
+                struct timeval t1;
+                struct timeval t2;
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  gettimeofday(&t1, NULL);
+                }
                 auto out_tensor_list =
                     CastPyArg2VectorOfTensor(py_out_tensor_list.ptr(), 0);
                 Tensor stack_out_tensor = paddle::stack(out_tensor_list, 0);
@@ -796,7 +917,25 @@ void BindDistributed(py::module *m) {
                                            in_dense,
                                            /*sync_op*/ true,
                                            /*use_calc_stream*/ true);
+                // std::cout << "all_gather_on_calc_stream" << std::endl;
                 SplitTensor(*dev_ctx, *out_dense, &out_tensor_list);
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  platform::DeviceContextPool::Instance().Get(place)->Wait();
+                  gettimeofday(&t2, NULL);
+
+                  uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) +
+                                  t2.tv_usec - t1.tv_usec;
+                  VLOG(3) << "op_name "
+                          << "c_all_gather_on_cal"
+                          << " " << diff << " "
+                          << "XPU"
+                          << " " << in_dense.dtype() << std::endl;
+                  std::cout << "op_name "
+                            << "c_all_gather_on_cal"
+                            << " " << diff << " "
+                            << "XPU"
+                            << " " << in_dense.dtype() << std::endl;
+                }
                 return task;
               },
               py::arg("out"),
@@ -808,6 +947,8 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_out_tensor,
                  py::handle py_in_tensor) {
+                // std::cout << "CXK" << "all_gather_into_tensor_on_calc_stream"
+                // << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -834,6 +975,8 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  int nranks,
                  int rank_id) {
+                // std::cout << "CXK" << "all_gather_partial_on_calc_stream" <<
+                // std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -866,6 +1009,8 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "all_reduce_on_calc_stream" <<
+                // std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -887,6 +1032,13 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_out_tensor_list,
                  py::handle py_in_tensor_list) {
+                phi::XPUPlace place(
+                    phi::backends::xpu::GetXPUCurrentDeviceId());
+                struct timeval t1;
+                struct timeval t2;
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  gettimeofday(&t1, NULL);
+                }
                 auto out_tensor_list =
                     CastPyArg2VectorOfTensor(py_out_tensor_list.ptr(), 0);
                 Tensor stack_out_tensor = paddle::stack(out_tensor_list, 0);
@@ -912,7 +1064,25 @@ void BindDistributed(py::module *m) {
                                   GetDefaultSplitSizes(in_dense, world_size),
                                   /*sync_op*/ true,
                                   /*use_calc_stream*/ true);
+                // std::cout << "all_to_all_on_calc_stream" << std::endl;
                 SplitTensor(*dev_ctx, *out_dense, &out_tensor_list);
+                if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+                  platform::DeviceContextPool::Instance().Get(place)->Wait();
+                  gettimeofday(&t2, NULL);
+
+                  uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) +
+                                  t2.tv_usec - t1.tv_usec;
+                  VLOG(3) << "op_name "
+                          << "c_all_to_all_on_cal"
+                          << " " << diff << " "
+                          << "XPU"
+                          << " " << in_dense.dtype() << std::endl;
+                  std::cout << "op_name "
+                            << "c_all_to_all_on_cal"
+                            << " " << diff << " "
+                            << "XPU"
+                            << " " << in_dense.dtype() << std::endl;
+                }
                 return task;
               },
               py::arg("out"),
@@ -924,6 +1094,8 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_out_tensor,
                  py::handle py_in_tensor) {
+                // std::cout << "CXK" << "all_to_all_tensor_on_calc_stream" <<
+                // std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -954,6 +1126,8 @@ void BindDistributed(py::module *m) {
                  py::handle py_in_tensor,
                  const std::vector<int64_t> &out_sizes,
                  const std::vector<int64_t> &in_sizes) {
+                // std::cout << "CXK" << "all_to_all_single_on_calc_stream" <<
+                // std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -982,6 +1156,8 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int src) {
+                // std::cout << "CXK" << "broadcast_on_calc_stream" <<
+                // std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -1004,6 +1180,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_tensor,
                  int dst,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "reduce_on_calc_stream" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -1027,6 +1204,8 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor_list,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "reduce_scatter_on_calc_stream" <<
+                // std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -1057,6 +1236,8 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor,
                  distributed::ReduceOp op) {
+                // std::cout << "CXK" << "reduce_scatter_tensor_on_calc_stream"
+                // << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -1085,6 +1266,7 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor_list,
                  int src) {
+                // std::cout << "CXK" << "scatter_on_calc_stream" << std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -1115,6 +1297,8 @@ void BindDistributed(py::module *m) {
                  py::handle py_out_tensor,
                  py::handle py_in_tensor,
                  int src) {
+                // std::cout << "CXK" << "scatter_tensor_on_calc_stream" <<
+                // std::endl;
                 auto out_tensor = CastPyArg2Tensor(py_out_tensor.ptr(), 0);
                 auto p_out_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
                     out_tensor.impl());
@@ -1142,6 +1326,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int dst) {
+                // std::cout << "CXK" << "send_on_calc_stream" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -1162,6 +1347,8 @@ void BindDistributed(py::module *m) {
                  int dst_rank,
                  int nranks,
                  int rank_id) {
+                // std::cout << "CXK" << "send_partial_on_calc_stream" <<
+                // std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -1189,6 +1376,7 @@ void BindDistributed(py::module *m) {
               [](distributed::ProcessGroup &self,
                  py::handle py_tensor,
                  int src) {
+                // std::cout << "CXK" << "recv_on_calc_stream" << std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());
@@ -1209,6 +1397,8 @@ void BindDistributed(py::module *m) {
                  int src_rank,
                  int nranks,
                  int rank_id) {
+                // std::cout << "CXK" << "recv_partial_on_calc_stream" <<
+                // std::endl;
                 auto tensor = CastPyArg2Tensor(py_tensor.ptr(), 0);
                 auto p_dense =
                     std::dynamic_pointer_cast<phi::DenseTensor>(tensor.impl());

@@ -500,6 +500,13 @@ static void OpBaseRunImpl(const framework::OperatorBase& op,
 
   VLOG(5) << LayerDebugString(op.Type(), ins, outs);
 
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+    std::cout << "op_name " << op.Type() << " "
+              << "start\n";
+  }
   /**
    * [ Why need temporary inputs here? ]
    *
@@ -526,6 +533,21 @@ static void OpBaseRunImpl(const framework::OperatorBase& op,
     prepared_op.Run(ins, outs, attrs, default_attrs);
   } else {
     prepared_op.Run(*tmp_ins_ptr, outs, attrs, default_attrs);
+  }
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    if (platform::is_xpu_place(place)) {
+      platform::DeviceContextPool& pool =
+          platform::DeviceContextPool::Instance();
+      auto* dev_ctx = pool.Get(place);
+      dev_ctx->Wait();
+    }
+    gettimeofday(&t2, NULL);
+    uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+    std::stringstream time_buffer;
+    time_buffer << "op_name " << op.Type() << " " << diff << " "
+                << prepared_op.kernel_key().backend() << " "
+                << prepared_op.kernel_key().dtype() << "\n";
+    std::cout << time_buffer.str();
   }
 
   VLOG(4) << LayerDebugString(op.Type(), ins, outs);

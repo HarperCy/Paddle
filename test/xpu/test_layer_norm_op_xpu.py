@@ -81,7 +81,21 @@ class XPUTestLayerNormOp(XPUOpTestWrapper):
             )
             ref_y_np = ref_y_np.astype(self.dtype)
 
-            self.inputs = {'X': x_np, 'Scale': scale_np, 'Bias': bias_np}
+            scale_tensor = paddle.to_tensor(
+                scale_np,
+                place=self.place,
+                stop_gradient=False,
+            )
+            bias_tensor = paddle.to_tensor(
+                bias_np,
+                place=self.place,
+                stop_gradient=False,
+            )
+            self.inputs = {
+                'X': x_np,
+                'Scale': scale_tensor,
+                'Bias': bias_tensor,
+            }
             self.outputs = {
                 'Y': ref_y_np,
                 'Mean': ref_mean_np,

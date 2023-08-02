@@ -1961,6 +1961,13 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
                                        platform::TracerEventType::OperatorInner,
                                        1,
                                        platform::EventRole::kInnerOp);
+    struct timeval t1;
+    struct timeval t2;
+    if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+      gettimeofday(&t1, NULL);
+      std::cout << "op_name " << type_ << " "
+                << "start\n";
+    }
     if (run_phi_kernel_ && phi_kernel_->GetKernelRegisteredType() ==
                                phi::KernelRegisteredType::FUNCTION) {
       phi::KernelContext phi_kernel_context;
@@ -2011,6 +2018,20 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
     }
     if (fallback_to_cpu) {
       phi_kernel_.release();
+    }
+    if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+      if (platform::is_xpu_place(place)) {
+        dev_ctx->Wait();
+      }
+      gettimeofday(&t2, NULL);
+      uint32_t diff =
+          1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+      VLOG(3) << "op_name " << type_ << " " << diff << " "
+              << kernel_type_->place_ << " " << kernel_type_->data_type_
+              << std::endl;
+      std::cout << "op_name " << type_ << " " << diff << " "
+                << kernel_type_->place_ << " " << kernel_type_->data_type_
+                << std::endl;
     }
   }
 

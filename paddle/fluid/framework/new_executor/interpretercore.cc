@@ -882,6 +882,12 @@ void InterpreterCore::RunOperator(const Instruction& instr_node) {
                                        : var_scope_.GetMutableScope();
   VLOG(4) << "Start run " << place << " " << op->DebugStringEx(local_scope);
 
+  // struct timeval t1;
+  // struct timeval t2;
+  // if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+  //   gettimeofday(&t1, NULL);
+  // }
+
   auto op_with_kernel = dynamic_cast<const framework::OperatorWithKernel*>(op);
   {
     // If it is OperatorBase, InferShape do nothing.
@@ -950,6 +956,23 @@ void InterpreterCore::RunOperator(const Instruction& instr_node) {
       }
     }
   }
+
+  // if (op_with_kernel != nullptr && std::getenv("XPU_PADDLE_OP_TIME") !=
+  // nullptr) {
+  //   if (platform::is_xpu_place(place_)) {
+  //     platform::DeviceContextPool::Instance().Get(place_)->Wait();
+  //   }
+  //   gettimeofday(&t2, NULL);
+
+  //   uint32_t diff =
+  //       1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+  //   VLOG(3) << "op_name " << op->Type() << " " << diff << " "
+  //           << place_ << " " << op_with_kernel->kernel_type()->data_type_
+  //           << std::endl;
+  //   std::cout << "op_name " << op->Type() << " " << diff << " "
+  //             << place_ << " " << op_with_kernel->kernel_type()->data_type_
+  //             << std::endl;
+  // }
 
   VLOG(4) << "End run " << place << " " << op->DebugStringEx(local_scope);
 

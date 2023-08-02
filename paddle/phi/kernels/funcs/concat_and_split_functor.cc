@@ -82,18 +82,22 @@ struct SplitFunctor<phi::CPUContext, T> {
                   std::vector<phi::DenseTensor*>* outputs) {
     // NOTE(zhiqiu): split a tensor of shape [0,3,4] at axis=1, result in 3
     // tensors of shape [0,1,4]
+    // std::cout << "bug6" << std::endl;
     if (input.numel() == 0) {
       return;
     }
+    // std::cout << "bug7" << std::endl;
 
     // TODO(zcd): Add input data validity checking
     size_t num = outputs->size();
+    // std::cout << "bug8" << std::endl;
 
     int input_rows = 1;
     auto dim_0 = ref_inputs[0]->dims();
     for (int i = 0; i < axis; ++i) {
       input_rows *= dim_0[i];
     }
+    // std::cout << "bug9" << std::endl;
 
     int input_cols = 0;
 
@@ -104,11 +108,13 @@ struct SplitFunctor<phi::CPUContext, T> {
       output_cols[i] = t_cols;
     }
     auto cpu_place = context.GetPlace();
+    // std::cout << "bug10" << std::endl;
 
     // computation
     for (int k = 0; k < input_rows; ++k) {
       const T* src_ptr = input.data<T>() + k * input_cols;
       int col_idx = 0;
+      // std::cout << "bug11" << std::endl;
       for (size_t j = 0; j < num; ++j) {
         int col_len = output_cols[j];
         auto* out_tensor = outputs->at(j);
@@ -123,6 +129,7 @@ struct SplitFunctor<phi::CPUContext, T> {
         col_idx += col_len;
       }
     }
+    // std::cout << "bug12" << std::endl;
   }
 };
 

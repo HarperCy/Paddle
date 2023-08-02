@@ -67,7 +67,8 @@ void LayerNormGradKernel(const Context& ctx,
   } else {
     // no need to cast
     scale_data_fp32 = scale_ptr->data<float>();
-    scale_grad_data_fp32 = ctx.template Alloc<float>(scale_grad);
+    scale_grad_data_fp32 =
+        scale_grad == nullptr ? nullptr : ctx.template Alloc<float>(scale_grad);
   }
 
   // bias
@@ -82,7 +83,8 @@ void LayerNormGradKernel(const Context& ctx,
     bias_grad_data_fp32 = RAII_GUARD.alloc_l3_or_gm<float>(bias_ptr->numel());
   } else {
     // no need to cast
-    bias_grad_data_fp32 = ctx.template Alloc<float>(bias_grad);
+    bias_grad_data_fp32 =
+        bias_grad == nullptr ? nullptr : ctx.template Alloc<float>(bias_grad);
   }
 
   auto* x_grad_data =

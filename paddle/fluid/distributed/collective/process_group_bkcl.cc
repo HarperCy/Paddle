@@ -14,6 +14,7 @@
 
 #include "paddle/fluid/distributed/collective/process_group_bkcl.h"
 
+#include <cassert>
 #include "paddle/fluid/distributed/collective/bkcl_tools.h"
 #include "paddle/fluid/distributed/collective/common.h"
 #include "paddle/fluid/distributed/collective/utils.h"
@@ -282,6 +283,14 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
     const AllreduceOptions& opts,
     bool sync_op,
     bool use_calc_stream) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
+  // assert(1==0);
+  // std::cout << "CXK!" << std::endl;
   return Collective(
       out_tensor,
       in_tensor,
@@ -306,7 +315,53 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
                                 framework::TransToProtoVarType(input.type())),
                             ToBKCLRedType(opts.reduce_op),
                             stream);
+        if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+          // const auto* calc_ctx = static_cast<XPUContext*>(
+          //   platform::DeviceContextPool::Instance().Get(place_));
+          static_cast<XPUContext*>(
+              platform::DeviceContextPool::Instance().Get(in_tensor.place()))
+              ->Wait();
+          gettimeofday(&t2, NULL);
+
+          uint32_t diff =
+              1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+          VLOG(3) << "op_name "
+                  << "c_all_reduce_cal_stream"
+                  << " " << diff << " "
+                  << "XPU"
+                  << " " << in_tensor.dtype() << std::endl;
+          std::cout << "op_name "
+                    << "c_all_reduce_cal_stream"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensor.dtype() << std::endl;
+        }
         return r;
+        // if (framework::TransToProtoVarType(input.dtype()) ==
+        //     framework::proto::VarType::INT64) {
+        //   // special for int64_t, send as int32_t with DOUBLE NUMEL
+        //   int r =
+        //     bkcl_all_reduce(comm,
+        //                     input.data(),
+        //                     output->data(),
+        //                     input.numel() * 2,
+        //                     platform::ToBKCLDataType(
+        //                         framework::proto::VarType::INT32),
+        //                     ToBKCLRedType(opts.reduce_op),
+        //                     stream);
+        //   return r;
+        // } else {
+        //   int r =
+        //     bkcl_all_reduce(comm,
+        //                     input.data(),
+        //                     output->data(),
+        //                     input.numel(),
+        //                     platform::ToBKCLDataType(
+        //                         framework::TransToProtoVarType(input.type())),
+        //                     ToBKCLRedType(opts.reduce_op),
+        //                     stream);
+        //   return r;
+        // }
       },
       CommType::ALLREDUCE,
       sync_op,
@@ -319,6 +374,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
     const BroadcastOptions& opts,
     bool sync_op,
     bool use_calc_stream) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   return Collective(
       out_tensor,
       in_tensor,
@@ -345,6 +406,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
               platform::ToBKCLDataType(framework::proto::VarType::INT32),
               root,
               stream);
+          if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+            static_cast<XPUContext*>(
+                platform::DeviceContextPool::Instance().Get(in_tensor.place()))
+                ->Wait();
+            gettimeofday(&t2, NULL);
+
+            uint32_t diff =
+                1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+            VLOG(3) << "op_name "
+                    << "c_broadcast_cal_stream_if"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensor.dtype() << std::endl;
+            std::cout << "op_name "
+                      << "c_broadcast_cal_stream_if"
+                      << " " << diff << " "
+                      << "XPU"
+                      << " " << in_tensor.dtype() << std::endl;
+          }
           return r;
         } else {
           int r =
@@ -356,6 +436,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
                                  framework::TransToProtoVarType(input.type())),
                              root,
                              stream);
+          if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+            static_cast<XPUContext*>(
+                platform::DeviceContextPool::Instance().Get(in_tensor.place()))
+                ->Wait();
+            gettimeofday(&t2, NULL);
+
+            uint32_t diff =
+                1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+            VLOG(3) << "op_name "
+                    << "c_broadcast_cal_stream_else"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensor.dtype() << std::endl;
+            std::cout << "op_name "
+                      << "c_broadcast_cal_stream_else"
+                      << " " << diff << " "
+                      << "XPU"
+                      << " " << in_tensor.dtype() << std::endl;
+          }
           return r;
         }
       },
@@ -401,6 +500,7 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllGather(
                             platform::ToBKCLDataType(
                                 framework::TransToProtoVarType(input.type())),
                             stream);
+        VLOG(3) << "bkcl_all_gather done";
         return r;
       },
       CommType::ALLGATHER,
@@ -485,6 +585,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::ReduceScatter(
 
 std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Barrier(
     const BarrierOptions& opts) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   PADDLE_ENFORCE_GE(opts.device_id,
                     0,
                     platform::errors::PreconditionNotMet(
@@ -502,6 +608,24 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Barrier(
                         /*use_calc_stream*/ false);
   auto bkcl_task = dynamic_cast<BKCLTask*>(task.get());
   bkcl_task->barrier_ = true;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    static_cast<XPUContext*>(
+        platform::DeviceContextPool::Instance().Get(barrier_tensor.place()))
+        ->Wait();
+    gettimeofday(&t2, NULL);
+
+    uint32_t diff = 1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+    VLOG(3) << "op_name "
+            << "c_barrier"
+            << " " << diff << " "
+            << "XPU"
+            << " " << barrier_tensor.dtype() << std::endl;
+    std::cout << "op_name "
+              << "c_barrier"
+              << " " << diff << " "
+              << "XPU"
+              << " " << barrier_tensor.dtype() << std::endl;
+  }
   return task;
 }
 
@@ -531,6 +655,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
     std::vector<phi::DenseTensor>& in_tensors,
     std::vector<phi::DenseTensor>& out_tensors,
     const AllreduceOptions& opts) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   PADDLE_ENFORCE_EQ(
       in_tensors.size(),
       1,
@@ -568,6 +698,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
                                 framework::TransToProtoVarType(input.type())),
                             ToBKCLRedType(opts.reduce_op),
                             stream);
+        if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+          static_cast<XPUContext*>(platform::DeviceContextPool::Instance().Get(
+                                       in_tensors[0].place()))
+              ->Wait();
+          gettimeofday(&t2, NULL);
+
+          uint32_t diff =
+              1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+          VLOG(3) << "op_name "
+                  << "c_all_reduce_group"
+                  << " " << diff << " "
+                  << "XPU"
+                  << " " << in_tensors[0].dtype() << std::endl;
+          std::cout << "op_name "
+                    << "c_all_reduce_group"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensors[0].dtype() << std::endl;
+        }
         return r;
       },
       CommType::ALLREDUCE,
@@ -580,6 +729,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
     std::vector<phi::DenseTensor>& out_tensors,
     const AllreduceOptions& opts,
     bool sync_op) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   PADDLE_ENFORCE_EQ(
       in_tensors.size(),
       1,
@@ -617,6 +772,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::AllReduce(
                                 framework::TransToProtoVarType(input.type())),
                             ToBKCLRedType(opts.reduce_op),
                             stream);
+        if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+          static_cast<XPUContext*>(platform::DeviceContextPool::Instance().Get(
+                                       in_tensors[0].place()))
+              ->Wait();
+          gettimeofday(&t2, NULL);
+
+          uint32_t diff =
+              1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+          VLOG(3) << "op_name "
+                  << "c_all_reduce_gourp_sync"
+                  << " " << diff << " "
+                  << "XPU"
+                  << " " << in_tensors[0].dtype() << std::endl;
+          std::cout << "op_name "
+                    << "c_all_reduce_group_sync"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensors[0].dtype() << std::endl;
+        }
         return r;
       },
       CommType::ALLREDUCE,
@@ -628,6 +802,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
     std::vector<phi::DenseTensor>& in_tensors,
     std::vector<phi::DenseTensor>& out_tensors,
     const BroadcastOptions& opts) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   PADDLE_ENFORCE_EQ(
       in_tensors.size(),
       1,
@@ -668,6 +848,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
                                framework::TransToProtoVarType(input.type())),
                            root,
                            stream);
+        if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+          static_cast<XPUContext*>(platform::DeviceContextPool::Instance().Get(
+                                       in_tensors[0].place()))
+              ->Wait();
+          gettimeofday(&t2, NULL);
+
+          uint32_t diff =
+              1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+          VLOG(3) << "op_name "
+                  << "c_all_gather"
+                  << " " << diff << " "
+                  << "XPU"
+                  << " " << in_tensors[0].dtype() << std::endl;
+          std::cout << "op_name "
+                    << "c_all_gather"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensors[0].dtype() << std::endl;
+        }
         return r;
       },
       CommType::BROADCAST,
@@ -680,6 +879,12 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
     std::vector<phi::DenseTensor>& out_tensors,
     const BroadcastOptions& opts,
     bool sync_op) {
+  phi::XPUPlace place2(phi::backends::xpu::GetXPUCurrentDeviceId());
+  struct timeval t1;
+  struct timeval t2;
+  if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+    gettimeofday(&t1, NULL);
+  }
   PADDLE_ENFORCE_EQ(
       in_tensors.size(),
       1,
@@ -720,6 +925,25 @@ std::shared_ptr<ProcessGroup::Task> ProcessGroupBKCL::Broadcast(
                                framework::TransToProtoVarType(input.type())),
                            root,
                            stream);
+        if (std::getenv("XPU_PADDLE_OP_TIME") != nullptr) {
+          static_cast<XPUContext*>(platform::DeviceContextPool::Instance().Get(
+                                       in_tensors[0].place()))
+              ->Wait();
+          gettimeofday(&t2, NULL);
+
+          uint32_t diff =
+              1000000 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec;
+          VLOG(3) << "op_name "
+                  << "c_all_gather"
+                  << " " << diff << " "
+                  << "XPU"
+                  << " " << in_tensors[0].dtype() << std::endl;
+          std::cout << "op_name "
+                    << "c_all_gather"
+                    << " " << diff << " "
+                    << "XPU"
+                    << " " << in_tensors[0].dtype() << std::endl;
+        }
         return r;
       },
       CommType::BROADCAST,
